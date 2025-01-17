@@ -23,9 +23,9 @@ params.First_Alignment_MakeDb.partial = "false"
 params.First_Alignment_MakeDb.name_alignment = "_First_Alignment"
 
 // Process Parameters for First_Alignment_Collapse_AIRRseq:
-params.First_Alignment_Collapse_AIRRseq_V2.name_alignment = "_First_Alignment"
-params.First_Alignment_Collapse_AIRRseq_V2.n_max = 10
-params.First_Alignment_Collapse_AIRRseq_V2.ncores = 20
+params.First_Alignment_Collapse_AIRRseq.name_alignment = "_First_Alignment"
+params.First_Alignment_Collapse_AIRRseq.n_max = 10
+params.First_Alignment_Collapse_AIRRseq.ncores = 20
 
 params.filter_dupcount.name_alignment = "_First_Alignment"
 
