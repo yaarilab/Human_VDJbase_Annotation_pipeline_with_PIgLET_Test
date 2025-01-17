@@ -270,6 +270,30 @@ if(germlineFile.getName().endsWith("fasta")){
 }
 
 
+process Second_Alignment_V_MakeBlastDb {
+
+input:
+
+output:
+ file "${db_name}"  into g11_22_germlineDb0_g11_9
+
+script:
+
+if(germlineFile.getName().endsWith("fasta")){
+	"""
+	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
+	mkdir -m777 ${db_name}
+	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
+	"""
+}else{
+	"""
+	echo something if off
+	"""
+}
+
+}
+
+
 process First_Alignment_J_MakeBlastDb {
 
 input:
@@ -1008,6 +1032,120 @@ tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
 """
 }
 
+
+process Second_Alignment_IgBlastn {
+
+input:
+ set val(name),file(fastaFile) from g_80_germlineFastaFile0_g11_9
+ file db_v from g11_22_germlineDb0_g11_9
+ file db_d from g11_16_germlineDb0_g11_9
+ file db_j from g11_17_germlineDb0_g11_9
+ file custom_internal_data from g_114_outputFileTxt0_g11_9
+
+output:
+ set val(name), file("${outfile}") optional true  into g11_9_igblastOut0_g11_12
+
+script:
+num_threads = params.Second_Alignment_IgBlastn.num_threads
+ig_seqtype = params.Second_Alignment_IgBlastn.ig_seqtype
+outfmt = params.Second_Alignment_IgBlastn.outfmt
+num_alignments_V = params.Second_Alignment_IgBlastn.num_alignments_V
+domain_system = params.Second_Alignment_IgBlastn.domain_system
+
+randomString = org.apache.commons.lang.RandomStringUtils.random(9, true, true)
+outname = name + "_" + randomString
+outfile = (outfmt=="MakeDb") ? name+"_"+randomString+".out" : name+"_"+randomString+".tsv"
+outfmt = (outfmt=="MakeDb") ? "'7 std qseq sseq btop'" : "19"
+
+if(db_v.toString()!="" && db_d.toString()!="" && db_j.toString()!=""){
+	"""
+	export IGDATA=/usr/local/share/igblast
+	
+	igblastn -query ${fastaFile} \
+		-germline_db_V ${db_v}/${db_v} \
+		-germline_db_D ${db_d}/${db_d} \
+		-germline_db_J ${db_j}/${db_j} \
+		-num_alignments_V ${num_alignments_V} \
+		-domain_system imgt \
+		-auxiliary_data ${custom_internal_data} \
+		-outfmt ${outfmt} \
+		-num_threads ${num_threads} \
+		-out ${outfile}
+	"""
+}else{
+	"""
+	"""
+}
+
+}
+
+
+process Second_Alignment_MakeDb {
+
+input:
+ set val(name),file(fastaFile) from g_80_germlineFastaFile0_g11_12
+ set val(name_igblast),file(igblastOut) from g11_9_igblastOut0_g11_12
+ set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g11_12
+ set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g11_12
+
+output:
+ set val(name_igblast),file("*_db-pass.tsv") optional true  into g11_12_outputFileTSV0_g14_0, g11_12_outputFileTSV0_g14_9
+ set val("reference_set"), file("${reference_set}") optional true  into g11_12_germlineFastaFile11
+ set val(name_igblast),file("*_db-fail.tsv") optional true  into g11_12_outputFileTSV22
+
+script:
+
+failed = params.Second_Alignment_MakeDb.failed
+format = params.Second_Alignment_MakeDb.format
+regions = params.Second_Alignment_MakeDb.regions
+extended = params.Second_Alignment_MakeDb.extended
+asisid = params.Second_Alignment_MakeDb.asisid
+asiscalls = params.Second_Alignment_MakeDb.asiscalls
+inferjunction = params.Second_Alignment_MakeDb.inferjunction
+partial = params.Second_Alignment_MakeDb.partial
+name_alignment = params.Second_Alignment_MakeDb.name_alignment
+
+failed = (failed=="true") ? "--failed" : ""
+format = (format=="changeo") ? "--format changeo" : ""
+extended = (extended=="true") ? "--extended" : ""
+regions = (regions=="rhesus-igl") ? "--regions rhesus-igl" : ""
+asisid = (asisid=="true") ? "--asis-id" : ""
+asiscalls = (asiscalls=="true") ? "--asis-calls" : ""
+inferjunction = (inferjunction=="true") ? "--infer-junction" : ""
+partial = (partial=="true") ? "--partial" : ""
+
+reference_set = "reference_set_makedb_"+name_alignment+".fasta"
+
+outname = name_igblast+'_'+name_alignment
+
+if(igblastOut.getName().endsWith(".out")){
+	"""
+	
+	cat ${v_germline_file} ${d_germline_file} ${j_germline_file} > ${reference_set}
+	
+	MakeDb.py igblast \
+		-s ${fastaFile} \
+		-i ${igblastOut} \
+		-r ${v_germline_file} ${d_germline_file} ${j_germline_file} \
+		--log MD_${name}.log \
+		--outname ${outname}\
+		${extended} \
+		${failed} \
+		${format} \
+		${regions} \
+		${asisid} \
+		${asiscalls} \
+		${inferjunction} \
+		${partial}
+	"""
+}else{
+	"""
+	
+	"""
+}
+
+}
+
 if(params.container.startsWith("peresay")){
 	cmd = 'source("/usr/local/bin/functions_tigger.R")'
 }else{
@@ -1022,7 +1160,7 @@ input:
 
 output:
  set val(name),file("*novel-passed.tsv") optional true  into g_8_outputFileTSV00
- set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g11_22, g_8_germlineFastaFile1_g11_12
+ set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g14_0, g_8_germlineFastaFile1_g14_1
 
 script:
 chain = params.Undocumented_Alleles.chain
@@ -1177,146 +1315,7 @@ if (class(novel) != 'try-error') {
 
 }
 
-
-process Second_Alignment_V_MakeBlastDb {
-
-input:
- set val(db_name), file(germlineFile) from g_8_germlineFastaFile1_g11_22
-
-output:
- file "${db_name}"  into g11_22_germlineDb0_g11_9
-
-script:
-
-if(germlineFile.getName().endsWith("fasta")){
-	"""
-	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
-	mkdir -m777 ${db_name}
-	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
-	"""
-}else{
-	"""
-	echo something if off
-	"""
-}
-
-}
-
-
-process Second_Alignment_IgBlastn {
-
-input:
- set val(name),file(fastaFile) from g_80_germlineFastaFile0_g11_9
- file db_v from g11_22_germlineDb0_g11_9
- file db_d from g11_16_germlineDb0_g11_9
- file db_j from g11_17_germlineDb0_g11_9
- file custom_internal_data from g_114_outputFileTxt0_g11_9
-
-output:
- set val(name), file("${outfile}") optional true  into g11_9_igblastOut0_g11_12
-
-script:
-num_threads = params.Second_Alignment_IgBlastn.num_threads
-ig_seqtype = params.Second_Alignment_IgBlastn.ig_seqtype
-outfmt = params.Second_Alignment_IgBlastn.outfmt
-num_alignments_V = params.Second_Alignment_IgBlastn.num_alignments_V
-domain_system = params.Second_Alignment_IgBlastn.domain_system
-
-randomString = org.apache.commons.lang.RandomStringUtils.random(9, true, true)
-outname = name + "_" + randomString
-outfile = (outfmt=="MakeDb") ? name+"_"+randomString+".out" : name+"_"+randomString+".tsv"
-outfmt = (outfmt=="MakeDb") ? "'7 std qseq sseq btop'" : "19"
-
-if(db_v.toString()!="" && db_d.toString()!="" && db_j.toString()!=""){
-	"""
-	export IGDATA=/usr/local/share/igblast
-	
-	igblastn -query ${fastaFile} \
-		-germline_db_V ${db_v}/${db_v} \
-		-germline_db_D ${db_d}/${db_d} \
-		-germline_db_J ${db_j}/${db_j} \
-		-num_alignments_V ${num_alignments_V} \
-		-domain_system imgt \
-		-auxiliary_data ${custom_internal_data} \
-		-outfmt ${outfmt} \
-		-num_threads ${num_threads} \
-		-out ${outfile}
-	"""
-}else{
-	"""
-	"""
-}
-
-}
-
-
-process Second_Alignment_MakeDb {
-
-input:
- set val(name),file(fastaFile) from g_80_germlineFastaFile0_g11_12
- set val(name_igblast),file(igblastOut) from g11_9_igblastOut0_g11_12
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g11_12
- set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g11_12
- set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g11_12
-
-output:
- set val(name_igblast),file("*_db-pass.tsv") optional true  into g11_12_outputFileTSV0_g14_0, g11_12_outputFileTSV0_g14_9
- set val("reference_set"), file("${reference_set}") optional true  into g11_12_germlineFastaFile11
- set val(name_igblast),file("*_db-fail.tsv") optional true  into g11_12_outputFileTSV22
-
-script:
-
-failed = params.Second_Alignment_MakeDb.failed
-format = params.Second_Alignment_MakeDb.format
-regions = params.Second_Alignment_MakeDb.regions
-extended = params.Second_Alignment_MakeDb.extended
-asisid = params.Second_Alignment_MakeDb.asisid
-asiscalls = params.Second_Alignment_MakeDb.asiscalls
-inferjunction = params.Second_Alignment_MakeDb.inferjunction
-partial = params.Second_Alignment_MakeDb.partial
-name_alignment = params.Second_Alignment_MakeDb.name_alignment
-
-failed = (failed=="true") ? "--failed" : ""
-format = (format=="changeo") ? "--format changeo" : ""
-extended = (extended=="true") ? "--extended" : ""
-regions = (regions=="rhesus-igl") ? "--regions rhesus-igl" : ""
-asisid = (asisid=="true") ? "--asis-id" : ""
-asiscalls = (asiscalls=="true") ? "--asis-calls" : ""
-inferjunction = (inferjunction=="true") ? "--infer-junction" : ""
-partial = (partial=="true") ? "--partial" : ""
-
-reference_set = "reference_set_makedb_"+name_alignment+".fasta"
-
-outname = name_igblast+'_'+name_alignment
-
-if(igblastOut.getName().endsWith(".out")){
-	"""
-	
-	cat ${v_germline_file} ${d_germline_file} ${j_germline_file} > ${reference_set}
-	
-	MakeDb.py igblast \
-		-s ${fastaFile} \
-		-i ${igblastOut} \
-		-r ${v_germline_file} ${d_germline_file} ${j_germline_file} \
-		--log MD_${name}.log \
-		--outname ${outname}\
-		${extended} \
-		${failed} \
-		${format} \
-		${regions} \
-		${asisid} \
-		${asiscalls} \
-		${inferjunction} \
-		${partial}
-	"""
-}else{
-	"""
-	
-	"""
-}
-
-}
-
+g_8_germlineFastaFile1_g14_0= g_8_germlineFastaFile1_g14_0.ifEmpty([""]) 
 g_122_germlineFastaFile0_g14_0= g_122_germlineFastaFile0_g14_0.ifEmpty([""]) 
 g_120_germlineFastaFile0_g14_0= g_120_germlineFastaFile0_g14_0.ifEmpty([""]) 
 
@@ -1325,6 +1324,7 @@ process Clone_AIRRseq_First_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g11_12_outputFileTSV0_g14_0
+ set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g14_0
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g14_0
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g14_0
 
@@ -1442,6 +1442,7 @@ DefineClones.py -d ${airrFile} \
 
 }
 
+g_8_germlineFastaFile1_g14_1= g_8_germlineFastaFile1_g14_1.ifEmpty([""]) 
 g_122_germlineFastaFile0_g14_1= g_122_germlineFastaFile0_g14_1.ifEmpty([""]) 
 g_120_germlineFastaFile0_g14_1= g_120_germlineFastaFile0_g14_1.ifEmpty([""]) 
 
@@ -1450,6 +1451,7 @@ process Clone_AIRRseq_Second_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g14_2_outputFileTSV0_g14_1
+ set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g14_1
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g14_1
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g14_1
 
