@@ -11,7 +11,6 @@ params.First_Alignment_IgBlastn.outfmt = "MakeDb"
 params.First_Alignment_IgBlastn.num_alignments_V = "10"
 params.First_Alignment_IgBlastn.domain_system = "imgt"
 
-
 params.First_Alignment_MakeDb.failed = "true"
 params.First_Alignment_MakeDb.format = "airr"
 params.First_Alignment_MakeDb.regions = "default"
@@ -26,8 +25,6 @@ params.First_Alignment_MakeDb.name_alignment = "_First_Alignment"
 params.First_Alignment_Collapse_AIRRseq.name_alignment = "_First_Alignment"
 params.First_Alignment_Collapse_AIRRseq.n_max = 10
 params.First_Alignment_Collapse_AIRRseq.ncores = 20
-
-params.filter_dupcount.name_alignment = "_First_Alignment"
 
 // Process Parameters for Undocumented_Alleles:
 params.Undocumented_Alleles.chain = params.chain
