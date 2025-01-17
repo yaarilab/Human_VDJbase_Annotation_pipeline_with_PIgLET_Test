@@ -425,52 +425,6 @@ if(germlineFile.getName().endsWith("fasta")){
 
 }
 
-
-process airrseq_to_fasta {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /outfile$/) "airrseq_fasta/$filename"}
-input:
-
-output:
- set val(name), file(outfile)  into g_80_germlineFastaFile0_g11_12, g_80_germlineFastaFile0_g11_9
-
-script:
-
-outfile = name+"_collapsed_seq.fasta"
-
-"""
-#!/usr/bin/env Rscript
-
-data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
-
-data_columns <- names(data)
-
-# take extra columns after cdr3
-
-idx_cdr <- which(data_columns=="cdr3")+1
-
-add_columns <- data_columns[idx_cdr:length(data_columns)]
-
-unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
-
-unique_information <- unique_information[unique_information %in% data_columns]
-
-seqs <- data[["sequence"]]
-
-seqs_name <-
-  sapply(1:nrow(data), function(x) {
-    paste0(unique_information,
-           rep('=', length(unique_information)),
-           data[x, unique_information],
-           collapse = '|')
-  })
-seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
-
-tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
-
-"""
-}
-
 g_3_germlineFastaFile_g_122= g_3_germlineFastaFile_g_122.ifEmpty([""]) 
 
 
@@ -755,7 +709,7 @@ input:
  set val(name),file(airrFile) from g111_12_outputFileTSV0_g111_19
 
 output:
- set val(name), file("${outfile}"+"passed.tsv") optional true  into g111_19_outputFileTSV0_g_8
+ set val(name), file("${outfile}"+"passed.tsv") optional true  into g111_19_outputFileTSV0_g_8, g111_19_outputFileTSV0_g_80
  set val(name), file("${outfile}"+"failed*") optional true  into g111_19_outputFileTSV11
 
 script:
@@ -1007,6 +961,53 @@ if(airrFile.getName().endsWith(".tsv")){
 
 }
 
+
+process airrseq_to_fasta {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /outfile$/) "airrseq_fasta/$filename"}
+input:
+ set val(name), file(airrseq_data) from g111_19_outputFileTSV0_g_80
+
+output:
+ set val(name), file(outfile)  into g_80_germlineFastaFile0_g11_12, g_80_germlineFastaFile0_g11_9
+
+script:
+
+outfile = name+"_collapsed_seq.fasta"
+
+"""
+#!/usr/bin/env Rscript
+
+data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
+
+data_columns <- names(data)
+
+# take extra columns after cdr3
+
+idx_cdr <- which(data_columns=="cdr3")+1
+
+add_columns <- data_columns[idx_cdr:length(data_columns)]
+
+unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
+
+unique_information <- unique_information[unique_information %in% data_columns]
+
+seqs <- data[["sequence"]]
+
+seqs_name <-
+  sapply(1:nrow(data), function(x) {
+    paste0(unique_information,
+           rep('=', length(unique_information)),
+           data[x, unique_information],
+           collapse = '|')
+  })
+seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
+
+tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
+
+"""
+}
+
 if(params.container.startsWith("peresay")){
 	cmd = 'source("/usr/local/bin/functions_tigger.R")'
 }else{
@@ -1021,7 +1022,7 @@ input:
 
 output:
  set val(name),file("*novel-passed.tsv") optional true  into g_8_outputFileTSV00
- set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g11_22, g_8_germlineFastaFile1_g11_12, g_8_germlineFastaFile1_g14_0, g_8_germlineFastaFile1_g14_1
+ set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g11_22, g_8_germlineFastaFile1_g11_12
 
 script:
 chain = params.Undocumented_Alleles.chain
@@ -1316,7 +1317,6 @@ if(igblastOut.getName().endsWith(".out")){
 
 }
 
-g_8_germlineFastaFile1_g14_0= g_8_germlineFastaFile1_g14_0.ifEmpty([""]) 
 g_122_germlineFastaFile0_g14_0= g_122_germlineFastaFile0_g14_0.ifEmpty([""]) 
 g_120_germlineFastaFile0_g14_0= g_120_germlineFastaFile0_g14_0.ifEmpty([""]) 
 
@@ -1325,7 +1325,6 @@ process Clone_AIRRseq_First_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g11_12_outputFileTSV0_g14_0
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g14_0
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g14_0
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g14_0
 
@@ -1443,7 +1442,6 @@ DefineClones.py -d ${airrFile} \
 
 }
 
-g_8_germlineFastaFile1_g14_1= g_8_germlineFastaFile1_g14_1.ifEmpty([""]) 
 g_122_germlineFastaFile0_g14_1= g_122_germlineFastaFile0_g14_1.ifEmpty([""]) 
 g_120_germlineFastaFile0_g14_1= g_120_germlineFastaFile0_g14_1.ifEmpty([""]) 
 
@@ -1452,7 +1450,6 @@ process Clone_AIRRseq_Second_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g14_2_outputFileTSV0_g14_1
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g14_1
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g14_1
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g14_1
 
