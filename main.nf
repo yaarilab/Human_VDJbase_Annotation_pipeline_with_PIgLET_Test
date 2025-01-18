@@ -1022,7 +1022,7 @@ input:
 
 output:
  set val(name),file("*novel-passed.tsv") optional true  into g_8_outputFileTSV00
- set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g126_22, g_8_germlineFastaFile1_g126_12, g_8_germlineFastaFile1_g127_0, g_8_germlineFastaFile1_g127_1
+ set val("v_germline"), file("V_novel_germline.fasta") optional true  into g_8_germlineFastaFile1_g_128
 
 script:
 chain = params.Undocumented_Alleles.chain
@@ -1177,11 +1177,115 @@ if (class(novel) != 'try-error') {
 
 }
 
+g_8_germlineFastaFile1_g_128= g_8_germlineFastaFile1_g_128.ifEmpty([""]) 
+
+
+process change_names_fasta {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /changes.csv$/) "novel_changes/$filename"}
+input:
+ set val(name), file(v_ref) from g_8_germlineFastaFile1_g_128
+
+output:
+ set val(name), file("new_V_novel_germline*")  into g_128_germlineFastaFile0_g126_22, g_128_germlineFastaFile0_g126_12, g_128_germlineFastaFile0_g127_0, g_128_germlineFastaFile0_g127_1
+ file "changes.csv" optional true  into g_128_outputFileCSV1_g_124
+
+
+script:
+
+readArray_v_ref = v_ref.toString().split(' ')[0]
+
+if(readArray_v_ref.endsWith("fasta")){
+
+"""
+#!/usr/bin/env python3 
+
+import pandas as pd
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio import SeqIO
+from hashlib import sha256 
+
+
+def fasta_to_dataframe(file_path):
+    data = {'ID': [], 'Sequence': []}
+    with open(file_path, 'r') as file:
+        for record in SeqIO.parse(file, 'fasta'):
+            data['ID'].append(record.id)
+            data['Sequence'].append(str(record.seq))
+
+        df = pd.DataFrame(data)
+        return df
+
+
+file_path = '${readArray_v_ref}'  # Replace with the actual path
+df = fasta_to_dataframe(file_path)
+
+
+for index, row in df.iterrows():   
+  if len(row['ID']) > 50:
+    print("hoo")
+    print(row['ID'])
+    row['ID'] = row['ID'].split('*')[0] + '*' + row['ID'].split('*')[1].split('_')[0] + '_' + sha256(row['Sequence'].encode('utf-8')).hexdigest()[-4:]
+
+
+def dataframe_to_fasta(df, output_file, description_column='Description', default_description=''):
+    records = []
+
+    for index, row in df.iterrows():
+        sequence_record = SeqRecord(Seq(row['Sequence']), id=row['ID'])
+
+        # Use the description from the DataFrame if available, otherwise use the default
+        description = row.get(description_column, default_description)
+        sequence_record.description = description
+
+        records.append(sequence_record)
+
+    with open(output_file, 'w') as output_handle:
+        SeqIO.write(records, output_handle, 'fasta')
+
+def save_changes_to_csv(old_df, new_df, output_file):
+    changes = []
+    for index, (old_row, new_row) in enumerate(zip(old_df.itertuples(), new_df.itertuples()), 1):
+        if old_row.ID != new_row.ID:
+            changes.append({'Row': index, 'Old_ID': old_row.ID, 'New_ID': new_row.ID})
+    
+    changes_df = pd.DataFrame(changes)
+    if not changes_df.empty:
+        changes_df.to_csv(output_file, index=False)
+        
+output_file_path = 'new_V_novel_germline.fasta'
+
+dataframe_to_fasta(df, output_file_path)
+
+
+file_path = '${readArray_v_ref}'  # Replace with the actual path
+old_df = fasta_to_dataframe(file_path)
+
+output_csv_file = "changes.csv"
+save_changes_to_csv(old_df, df, output_csv_file)
+
+"""
+} else{
+	
+"""
+#!/usr/bin/env python3 
+	
+
+file_path = 'new_V_novel_germline.txt'
+
+with open(file_path, 'w'):
+    pass
+    
+"""    
+}    
+}
+
 
 process Second_Alignment_V_MakeBlastDb {
 
 input:
- set val(db_name), file(germlineFile) from g_8_germlineFastaFile1_g126_22
+ set val(db_name), file(germlineFile) from g_128_germlineFastaFile0_g126_22
 
 output:
  file "${db_name}"  into g126_22_germlineDb0_g126_9
@@ -1255,7 +1359,7 @@ process Second_Alignment_MakeDb {
 input:
  set val(name),file(fastaFile) from g_80_germlineFastaFile0_g126_12
  set val(name_igblast),file(igblastOut) from g126_9_igblastOut0_g126_12
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g126_12
+ set val(name1), file(v_germline_file) from g_128_germlineFastaFile0_g126_12
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g126_12
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g126_12
 
@@ -1317,7 +1421,7 @@ if(igblastOut.getName().endsWith(".out")){
 
 }
 
-g_8_germlineFastaFile1_g127_0= g_8_germlineFastaFile1_g127_0.ifEmpty([""]) 
+g_128_germlineFastaFile0_g127_0= g_128_germlineFastaFile0_g127_0.ifEmpty([""]) 
 g_122_germlineFastaFile0_g127_0= g_122_germlineFastaFile0_g127_0.ifEmpty([""]) 
 g_120_germlineFastaFile0_g127_0= g_120_germlineFastaFile0_g127_0.ifEmpty([""]) 
 
@@ -1326,7 +1430,7 @@ process Clone_AIRRseq_First_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g126_12_outputFileTSV0_g127_0
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g127_0
+ set val(name1), file(v_germline_file) from g_128_germlineFastaFile0_g127_0
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g127_0
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g127_0
 
@@ -1444,7 +1548,7 @@ DefineClones.py -d ${airrFile} \
 
 }
 
-g_8_germlineFastaFile1_g127_1= g_8_germlineFastaFile1_g127_1.ifEmpty([""]) 
+g_128_germlineFastaFile0_g127_1= g_128_germlineFastaFile0_g127_1.ifEmpty([""]) 
 g_122_germlineFastaFile0_g127_1= g_122_germlineFastaFile0_g127_1.ifEmpty([""]) 
 g_120_germlineFastaFile0_g127_1= g_120_germlineFastaFile0_g127_1.ifEmpty([""]) 
 
@@ -1453,7 +1557,7 @@ process Clone_AIRRseq_Second_CreateGermlines {
 
 input:
  set val(name),file(airrFile) from g127_2_outputFileTSV0_g127_1
- set val(name1), file(v_germline_file) from g_8_germlineFastaFile1_g127_1
+ set val(name1), file(v_germline_file) from g_128_germlineFastaFile0_g127_1
  set val(name2), file(d_germline_file) from g_122_germlineFastaFile0_g127_1
  set val(name3), file(j_germline_file) from g_120_germlineFastaFile0_g127_1
 
@@ -1656,6 +1760,7 @@ cat(lines, sep = "\n", file = file_path, append = TRUE)
 
 g_122_outputFileCSV1_g_124= g_122_outputFileCSV1_g_124.ifEmpty([""]) 
 g_120_outputFileCSV1_g_124= g_120_outputFileCSV1_g_124.ifEmpty([""]) 
+g_128_outputFileCSV1_g_124= g_128_outputFileCSV1_g_124.ifEmpty([""]) 
 
 
 process changes_names_for_piglet {
@@ -1667,6 +1772,7 @@ input:
  file v_change from g_116_csvFile1_g_124
  file d_change from g_122_outputFileCSV1_g_124
  file j_change from g_120_outputFileCSV1_g_124
+ file v_change_novel from g_128_outputFileCSV1_g_124
 
 output:
  set val(name),file("*_change_name.tsv")  into g_124_outputFileTSV00
@@ -1717,7 +1823,26 @@ if (file.exists(change_file)) {
 	}
 	data[["v_call"]] <- data[["v_call_changed"]]
 } else {
-  message("Change file does not exist. No changes applied to j_call.")
+  message("Change file does not exist. No changes applied to v_call.")
+}
+
+if (file.exists("changes.csv")) {
+	data[, `:=`(
+	  v_call_changed = v_call,
+	  d_call_changed = d_call,
+	  j_call_changed = j_call
+	)]
+	# Apply changes to v_call
+	change_file <- "changes.csv"
+    changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
+	for (change in 1:nrow(changes)) {
+	  old_id <- changes[change, "old_id"]
+	  new_id <- changes[change, "new_id"]
+	  data[str_detect(v_call, fixed(new_id)), v_call_changed := old_id]
+	}
+	data[["v_call"]] <- data[["v_call_changed"]]
+} else {
+  message("Change file does not exist. No changes applied to v_call.")
 }
 
 # Apply changes to d_call if chain is IGH
