@@ -1365,7 +1365,7 @@ input:
 
 output:
  set val(name_igblast),file("*_db-pass.tsv") optional true  into g126_12_outputFileTSV0_g127_0, g126_12_outputFileTSV0_g127_9
- set val("reference_set"), file("${reference_set}") optional true  into g126_12_germlineFastaFile11
+ set val("reference_set"), file("${reference_set}") optional true  into g126_12_germlineFastaFile1_g_124
  set val(name_igblast),file("*_db-fail.tsv") optional true  into g126_12_outputFileTSV22
 
 script:
@@ -1773,10 +1773,12 @@ input:
  file d_change from g_122_outputFileCSV1_g_124
  file j_change from g_120_outputFileCSV1_g_124
  file v_change_novel from g_128_outputFileCSV1_g_124
+ set val(name2),file(reference) from g126_12_germlineFastaFile1_g_124
 
 output:
  set val(name),file("*_change_name.tsv")  into g_124_outputFileTSV00
  set val(name),file("*_to_piglet.tsv")  into g_124_outputFileTSV11
+ set val(name),file("*_change_name_reference.tsv")  into g_124_outputFileTSV22
 
 script:
 chain = params.changes_names_for_piglet.chain
@@ -1814,12 +1816,17 @@ data[, `:=`(
   j_call_changed = j_call
 )]
 
+reference = tigger::readIgFasta("${reference}")
+reference = data.table(allele = names(reference), sequence = reference, allele_changed = names(reference))
+
+
 if (file.exists(change_file)) {
 	# Apply changes to v_call
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
 	  new_id <- changes[change, "new_id"]
 	  data[str_detect(v_call, fixed(new_id)), v_call_changed := old_id]
+	  reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
 	}
 	data[["v_call"]] <- data[["v_call_changed"]]
 } else {
@@ -1839,6 +1846,7 @@ if (file.exists("changes.csv")) {
 	  old_id <- changes[change, "old_id"]
 	  new_id <- changes[change, "new_id"]
 	  data[str_detect(v_call, fixed(new_id)), v_call_changed := old_id]
+	  reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
 	}
 	data[["v_call"]] <- data[["v_call_changed"]]
 } else {
@@ -1854,6 +1862,7 @@ if ("${chain}" == "IGH") {
 	    old_id <- changes[change, "old_id"]
 	    new_id <- changes[change, "new_id"]
 	    data[, d_call_changed := str_replace_all(d_call_changed, fixed(new_id), old_id)]
+	    reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
 	  }
 	  data[["d_call"]] <- data[["d_call_changed"]]
 	} else {
@@ -1869,6 +1878,7 @@ if (file.exists(change_file)) {
     old_id <- changes[change, "old_id"]
     new_id <- changes[change, "new_id"]
     data[, j_call_changed := str_replace_all(j_call_changed, fixed(new_id), old_id)]
+    reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
   }
   data[["j_call"]] <- data[["j_call_changed"]]
 } else {
@@ -1883,6 +1893,9 @@ select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", 
 setDT(data)
 data_selected <- data[, .SD, .SDcols = select_columns]
 write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".tsv"), row.names = FALSE)
+
+# write the reference
+write.table(reference, sep = "\t", file = paste0("${outname}_reference", ".tsv"), row.names = FALSE)
 """
 
 }
