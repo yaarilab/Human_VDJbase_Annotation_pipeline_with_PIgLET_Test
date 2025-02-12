@@ -1767,6 +1767,7 @@ process changes_names_for_piglet {
 
 publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_change_name.tsv$/) "pre_genotype/$filename"}
 publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_to_piglet.tsv$/) "pre_genotype/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_change_name_reference.tsv$/) "pre_genotype/$filename"}
 input:
  set val(name),file(airrFile) from g127_9_outputFileTSV0_g_124
  file v_change from g_116_csvFile1_g_124
