@@ -1256,7 +1256,7 @@ def save_changes_to_csv(old_df, new_df, output_file):
         changes_df.to_csv(output_file, index=False)
     else:
     	df = pd.DataFrame(list())
-		df.to_csv('changes.txt')
+    	df.to_csv('changes.txt')
         
 output_file_path = 'new_V_novel_germline.fasta'
 
