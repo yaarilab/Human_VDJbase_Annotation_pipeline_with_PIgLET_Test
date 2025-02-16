@@ -99,6 +99,7 @@ params.Clone_AIRRseq_Second_CreateGermlines.d_field = ""
 params.Clone_AIRRseq_Second_CreateGermlines.j_field = ""
 params.Clone_AIRRseq_Second_CreateGermlines.clone_field = ""
 
+params.changes_names_for_piglet.chain="IGH"
 
 if (!params.v_germline){params.v_germline = ""} 
 if (!params.d_germline){params.d_germline = ""} 
