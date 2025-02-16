@@ -1277,6 +1277,12 @@ file_path = 'new_V_novel_germline.txt'
 
 with open(file_path, 'w'):
     pass
+
+file_path = 'changes.csv'
+
+with open(file_path, 'w'):
+    pass
+
     
 """    
 }    
