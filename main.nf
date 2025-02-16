@@ -1189,7 +1189,7 @@ input:
 
 output:
  set val(name), file("new_V_novel_germline*")  into g_128_germlineFastaFile0_g126_22, g_128_germlineFastaFile0_g126_12, g_128_germlineFastaFile0_g127_0, g_128_germlineFastaFile0_g127_1
- file "changes.csv" optional true  into g_128_outputFileCSV1_g_124
+ file "changes.csv"  into g_128_outputFileCSV1_g_124
 
 
 script:
