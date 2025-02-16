@@ -115,18 +115,127 @@ Channel.fromPath(params.d_germline, type: 'any').map{ file -> tuple(file.baseNam
 Channel.fromPath(params.j_germline, type: 'any').map{ file -> tuple(file.baseName, file) }.set{g_4_germlineFastaFile_g_120}
 Channel.fromPath(params.airr_seq, type: 'any').map{ file -> tuple(file.baseName, file) }.into{g_96_fastaFile_g111_12;g_96_fastaFile_g111_9}
 
+
+process V_names_fasta {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes..*$/) "genomic_novel_changes/$filename"}
+input:
+ set val(name), file(v_ref) from g_2_germlineFastaFile_g_116
+
+output:
+ set val("v_ref"), file("new_V*")  into g_116_germlineFastaFile0_g_8, g_116_germlineFastaFile0_g111_22, g_116_germlineFastaFile0_g111_12
+ file "*changes.*"  into g_116_csvFile1_g_124
+
+
+script:
+
+readArray_v_ref = v_ref.toString().split(' ')[0]
+
+if(readArray_v_ref.endsWith("fasta")){
+
+"""
+#!/usr/bin/env python3 
+
+import pandas as pd
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio import SeqIO
+from hashlib import sha256 
+
+
+def fasta_to_dataframe(file_path):
+    data = {'ID': [], 'Sequence': []}
+    with open(file_path, 'r') as file:
+        for record in SeqIO.parse(file, 'fasta'):
+            data['ID'].append(record.id)
+            data['Sequence'].append(str(record.seq))
+
+        df = pd.DataFrame(data)
+        return df
+
+
+file_path = '${readArray_v_ref}'  # Replace with the actual path
+df = fasta_to_dataframe(file_path)
+
+index_counter = 30  # Start index
+
+for index, row in df.iterrows():
+    if '_' in row['ID']:
+        print(row['ID'])
+        parts = row['ID'].split('*')
+        row['ID'] = f"{parts[0]}*{index_counter}"
+        # df.at[index, 'ID'] = row['ID']  # Update DataFrame with the new value
+        index_counter += 1
+        
+        
+        
+def dataframe_to_fasta(df, output_file, description_column='Description', default_description=''):
+    records = []
+
+    for index, row in df.iterrows():
+        sequence_record = SeqRecord(Seq(row['Sequence']), id=row['ID'])
+
+        # Use the description from the DataFrame if available, otherwise use the default
+        description = row.get(description_column, default_description)
+        sequence_record.description = description
+
+        records.append(sequence_record)
+
+    with open(output_file, 'w') as output_handle:
+        SeqIO.write(records, output_handle, 'fasta')
+
+def save_changes_to_csv(old_df, new_df, output_file):
+    changes = []
+    for index, (old_row, new_row) in enumerate(zip(old_df.itertuples(), new_df.itertuples()), 1):
+        if old_row.ID != new_row.ID:
+            changes.append({'Row': index, 'Old_ID': old_row.ID, 'New_ID': new_row.ID})
+    
+    changes_df = pd.DataFrame(changes)
+    if not changes_df.empty:
+        changes_df.to_csv(output_file, index=False)
+    else:
+    	df = pd.DataFrame(list())
+    	df.to_csv('v_changes.txt')
+    	
+output_file_path = 'new_V.fasta'
+
+dataframe_to_fasta(df, output_file_path)
+
+
+file_path = '${readArray_v_ref}'  # Replace with the actual path
+old_df = fasta_to_dataframe(file_path)
+
+output_csv_file = "v_changes.csv"
+save_changes_to_csv(old_df, df, output_csv_file)
+
+"""
+} else{
+	
+"""
+#!/usr/bin/env python3 
+	
+
+file_path = 'new_V.txt'
+
+with open(file_path, 'w'):
+    pass
+    
+"""    
+}    
+}
+
 g_4_germlineFastaFile_g_120= g_4_germlineFastaFile_g_120.ifEmpty([""]) 
 
 
 process J_names_fasta {
 
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes.csv$/) "genomic_novel_changes/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes..*$/) "genomic_novel_changes/$filename"}
 input:
  set val(name), file(J_ref) from g_4_germlineFastaFile_g_120
 
 output:
  set val("j_ref"), file("new_J_novel_germline*")  into g_120_germlineFastaFile0_g_114, g_120_germlineFastaFile0_g111_17, g_120_germlineFastaFile0_g111_12, g_120_germlineFastaFile0_g126_17, g_120_germlineFastaFile0_g126_12, g_120_germlineFastaFile0_g127_0, g_120_germlineFastaFile0_g127_1
- file "*changes.csv" optional true  into g_120_outputFileCSV1_g_124
+ file "*changes.*"  into g_120_outputFileCSV1_g_124
 
 
 script:
@@ -196,7 +305,9 @@ def save_changes_to_csv(old_df, new_df, output_file):
     changes_df = pd.DataFrame(changes)
     if not changes_df.empty:
         changes_df.to_csv(output_file, index=False)
-
+    else:
+    	df = pd.DataFrame(list())
+    	df.to_csv('j_changes.txt')
 
 output_file_path = 'new_J_novel_germline.fasta'
 
@@ -225,219 +336,18 @@ with open(file_path, 'w'):
 }    
 }
 
-
-process make_igblast_annotate_j {
-
-input:
- set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g_114
-
-output:
- file aux_file  into g_114_outputFileTxt0_g111_9, g_114_outputFileTxt0_g126_9
-
-script:
-
-
-
-aux_file = "J.aux"
-
-"""
-annotate_j ${germlineFile} ${aux_file}
-"""
-}
-
-
-process Second_Alignment_J_MakeBlastDb {
-
-input:
- set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g126_17
-
-output:
- file "${db_name}"  into g126_17_germlineDb0_g126_9
-
-script:
-
-if(germlineFile.getName().endsWith("fasta")){
-	"""
-	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
-	mkdir -m777 ${db_name}
-	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
-	"""
-}else{
-	"""
-	echo something if off
-	"""
-}
-
-}
-
-
-process First_Alignment_J_MakeBlastDb {
-
-input:
- set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g111_17
-
-output:
- file "${db_name}"  into g111_17_germlineDb0_g111_9
-
-script:
-
-if(germlineFile.getName().endsWith("fasta")){
-	"""
-	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
-	mkdir -m777 ${db_name}
-	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
-	"""
-}else{
-	"""
-	echo something if off
-	"""
-}
-
-}
-
-
-process change_novel_to_not {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes.csv$/) "genomic_novel_changes/$filename"}
-input:
- set val(name), file(v_ref) from g_2_germlineFastaFile_g_116
-
-output:
- set val("v_ref"), file("new_V*")  into g_116_germlineFastaFile0_g_8, g_116_germlineFastaFile0_g111_22, g_116_germlineFastaFile0_g111_12
- file "*changes.csv" optional true  into g_116_csvFile1_g_124
-
-
-script:
-
-readArray_v_ref = v_ref.toString().split(' ')[0]
-
-if(readArray_v_ref.endsWith("fasta")){
-
-"""
-#!/usr/bin/env python3 
-
-import pandas as pd
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
-from Bio import SeqIO
-from hashlib import sha256 
-
-
-def fasta_to_dataframe(file_path):
-    data = {'ID': [], 'Sequence': []}
-    with open(file_path, 'r') as file:
-        for record in SeqIO.parse(file, 'fasta'):
-            data['ID'].append(record.id)
-            data['Sequence'].append(str(record.seq))
-
-        df = pd.DataFrame(data)
-        return df
-
-
-file_path = '${readArray_v_ref}'  # Replace with the actual path
-df = fasta_to_dataframe(file_path)
-
-index_counter = 30  # Start index
-
-for index, row in df.iterrows():
-    if '_' in row['ID']:
-        print(row['ID'])
-        parts = row['ID'].split('*')
-        row['ID'] = f"{parts[0]}*{index_counter}"
-        # df.at[index, 'ID'] = row['ID']  # Update DataFrame with the new value
-        index_counter += 1
-        
-        
-        
-def dataframe_to_fasta(df, output_file, description_column='Description', default_description=''):
-    records = []
-
-    for index, row in df.iterrows():
-        sequence_record = SeqRecord(Seq(row['Sequence']), id=row['ID'])
-
-        # Use the description from the DataFrame if available, otherwise use the default
-        description = row.get(description_column, default_description)
-        sequence_record.description = description
-
-        records.append(sequence_record)
-
-    with open(output_file, 'w') as output_handle:
-        SeqIO.write(records, output_handle, 'fasta')
-
-def save_changes_to_csv(old_df, new_df, output_file):
-    changes = []
-    for index, (old_row, new_row) in enumerate(zip(old_df.itertuples(), new_df.itertuples()), 1):
-        if old_row.ID != new_row.ID:
-            changes.append({'Row': index, 'Old_ID': old_row.ID, 'New_ID': new_row.ID})
-    
-    changes_df = pd.DataFrame(changes)
-    if not changes_df.empty:
-        changes_df.to_csv(output_file, index=False)
-        
-output_file_path = 'new_V.fasta'
-
-dataframe_to_fasta(df, output_file_path)
-
-
-file_path = '${readArray_v_ref}'  # Replace with the actual path
-old_df = fasta_to_dataframe(file_path)
-
-output_csv_file = "v_changes.csv"
-save_changes_to_csv(old_df, df, output_csv_file)
-
-"""
-} else{
-	
-"""
-#!/usr/bin/env python3 
-	
-
-file_path = 'new_V.txt'
-
-with open(file_path, 'w'):
-    pass
-    
-"""    
-}    
-}
-
-
-process First_Alignment_V_MakeBlastDb {
-
-input:
- set val(db_name), file(germlineFile) from g_116_germlineFastaFile0_g111_22
-
-output:
- file "${db_name}"  into g111_22_germlineDb0_g111_9
-
-script:
-
-if(germlineFile.getName().endsWith("fasta")){
-	"""
-	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
-	mkdir -m777 ${db_name}
-	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
-	"""
-}else{
-	"""
-	echo something if off
-	"""
-}
-
-}
-
 g_3_germlineFastaFile_g_122= g_3_germlineFastaFile_g_122.ifEmpty([""]) 
 
 
 process D_names_fasta {
 
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes.csv$/) "genomic_novel_changes/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*changes..*$/) "genomic_novel_changes/$filename"}
 input:
  set val(name), file(D_ref) from g_3_germlineFastaFile_g_122
 
 output:
  set val("d_ref"), file("new_D_novel_germline*")  into g_122_germlineFastaFile0_g111_16, g_122_germlineFastaFile0_g111_12, g_122_germlineFastaFile0_g126_16, g_122_germlineFastaFile0_g126_12, g_122_germlineFastaFile0_g127_0, g_122_germlineFastaFile0_g127_1
- file "*changes.csv" optional true  into g_122_outputFileCSV1_g_124
+ file "*changes.*"  into g_122_outputFileCSV1_g_124
 
 
 script:
@@ -507,6 +417,9 @@ def save_changes_to_csv(old_df, new_df, output_file):
     changes_df = pd.DataFrame(changes)
     if not changes_df.empty:
         changes_df.to_csv(output_file, index=False)
+    else:
+    	df = pd.DataFrame(list())
+    	df.to_csv('d_changes.txt')
         
 output_file_path = 'new_D_novel_germline.fasta'
 
@@ -536,6 +449,26 @@ with open(file_path, 'w'):
 }
 
 
+process make_igblast_annotate_j {
+
+input:
+ set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g_114
+
+output:
+ file aux_file  into g_114_outputFileTxt0_g111_9, g_114_outputFileTxt0_g126_9
+
+script:
+
+
+
+aux_file = "J.aux"
+
+"""
+annotate_j ${germlineFile} ${aux_file}
+"""
+}
+
+
 process Second_Alignment_D_MakeBlastDb {
 
 input:
@@ -561,6 +494,31 @@ if(germlineFile.getName().endsWith("fasta")){
 }
 
 
+process Second_Alignment_J_MakeBlastDb {
+
+input:
+ set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g126_17
+
+output:
+ file "${db_name}"  into g126_17_germlineDb0_g126_9
+
+script:
+
+if(germlineFile.getName().endsWith("fasta")){
+	"""
+	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
+	mkdir -m777 ${db_name}
+	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
+	"""
+}else{
+	"""
+	echo something if off
+	"""
+}
+
+}
+
+
 process First_Alignment_D_MakeBlastDb {
 
 input:
@@ -568,6 +526,56 @@ input:
 
 output:
  file "${db_name}"  into g111_16_germlineDb0_g111_9
+
+script:
+
+if(germlineFile.getName().endsWith("fasta")){
+	"""
+	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
+	mkdir -m777 ${db_name}
+	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
+	"""
+}else{
+	"""
+	echo something if off
+	"""
+}
+
+}
+
+
+process First_Alignment_J_MakeBlastDb {
+
+input:
+ set val(db_name), file(germlineFile) from g_120_germlineFastaFile0_g111_17
+
+output:
+ file "${db_name}"  into g111_17_germlineDb0_g111_9
+
+script:
+
+if(germlineFile.getName().endsWith("fasta")){
+	"""
+	sed -e '/^>/! s/[.]//g' ${germlineFile} > tmp_germline.fasta
+	mkdir -m777 ${db_name}
+	makeblastdb -parse_seqids -dbtype nucl -in tmp_germline.fasta -out ${db_name}/${db_name}
+	"""
+}else{
+	"""
+	echo something if off
+	"""
+}
+
+}
+
+
+process First_Alignment_V_MakeBlastDb {
+
+input:
+ set val(db_name), file(germlineFile) from g_116_germlineFastaFile0_g111_22
+
+output:
+ file "${db_name}"  into g111_22_germlineDb0_g111_9
 
 script:
 
@@ -962,53 +970,6 @@ if(airrFile.getName().endsWith(".tsv")){
 
 }
 
-
-process airrseq_to_fasta {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /outfile$/) "airrseq_fasta/$filename"}
-input:
- set val(name), file(airrseq_data) from g111_19_outputFileTSV0_g_80
-
-output:
- set val(name), file(outfile)  into g_80_germlineFastaFile0_g126_12, g_80_germlineFastaFile0_g126_9
-
-script:
-
-outfile = name+"_collapsed_seq.fasta"
-
-"""
-#!/usr/bin/env Rscript
-
-data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
-
-data_columns <- names(data)
-
-# take extra columns after cdr3
-
-idx_cdr <- which(data_columns=="cdr3")+1
-
-add_columns <- data_columns[idx_cdr:length(data_columns)]
-
-unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
-
-unique_information <- unique_information[unique_information %in% data_columns]
-
-seqs <- data[["sequence"]]
-
-seqs_name <-
-  sapply(1:nrow(data), function(x) {
-    paste0(unique_information,
-           rep('=', length(unique_information)),
-           data[x, unique_information],
-           collapse = '|')
-  })
-seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
-
-tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
-
-"""
-}
-
 if(params.container.startsWith("peresay")){
 	cmd = 'source("/usr/local/bin/functions_tigger.R")'
 }else{
@@ -1302,6 +1263,53 @@ if(germlineFile.getName().endsWith("fasta")){
 	"""
 }
 
+}
+
+
+process airrseq_to_fasta {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /outfile$/) "airrseq_fasta/$filename"}
+input:
+ set val(name), file(airrseq_data) from g111_19_outputFileTSV0_g_80
+
+output:
+ set val(name), file(outfile)  into g_80_germlineFastaFile0_g126_12, g_80_germlineFastaFile0_g126_9
+
+script:
+
+outfile = name+"_collapsed_seq.fasta"
+
+"""
+#!/usr/bin/env Rscript
+
+data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
+
+data_columns <- names(data)
+
+# take extra columns after cdr3
+
+idx_cdr <- which(data_columns=="cdr3")+1
+
+add_columns <- data_columns[idx_cdr:length(data_columns)]
+
+unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
+
+unique_information <- unique_information[unique_information %in% data_columns]
+
+seqs <- data[["sequence"]]
+
+seqs_name <-
+  sapply(1:nrow(data), function(x) {
+    paste0(unique_information,
+           rep('=', length(unique_information)),
+           data[x, unique_information],
+           collapse = '|')
+  })
+seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
+
+tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
+
+"""
 }
 
 
