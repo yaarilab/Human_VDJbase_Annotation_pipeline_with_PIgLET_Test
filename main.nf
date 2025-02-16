@@ -1759,6 +1759,8 @@ cat(lines, sep = "\n", file = file_path, append = TRUE)
 """
 }
 
+g_128_outputFileCSV1_g_124= g_128_outputFileCSV1_g_124.ifEmpty([""]) 
+
 
 process changes_names_for_piglet {
 
