@@ -1183,13 +1183,13 @@ g_8_germlineFastaFile1_g_128= g_8_germlineFastaFile1_g_128.ifEmpty([""])
 
 process change_names_fasta {
 
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /changes.csv$/) "novel_changes/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /changes..*$/) "novel_changes/$filename"}
 input:
  set val(name), file(v_ref) from g_8_germlineFastaFile1_g_128
 
 output:
  set val(name), file("new_V_novel_germline*")  into g_128_germlineFastaFile0_g126_22, g_128_germlineFastaFile0_g126_12, g_128_germlineFastaFile0_g127_0, g_128_germlineFastaFile0_g127_1
- file "changes.csv"  into g_128_outputFileCSV1_g_124
+ file "changes.*"  into g_128_outputFileCSV1_g_124
 
 
 script:
@@ -1270,20 +1270,8 @@ save_changes_to_csv(old_df, df, output_csv_file)
 } else{
 	
 """
-#!/usr/bin/env python3 
-	
-
-file_path = 'new_V_novel_germline.txt'
-
-with open(file_path, 'w'):
-    pass
-
-file_path = 'changes.csv'
-
-with open(file_path, 'w'):
-    pass
-
-    
+touch 'new_V_novel_germline.txt'
+touch 'changes.txt'
 """    
 }    
 }
