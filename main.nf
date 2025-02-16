@@ -1807,7 +1807,6 @@ data <- data.table::fread("${airrFile}", data.table = F)
 
 # Load V change file
 change_file <- "v_changes.csv"
-changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
 
 # Convert to data.table
 setDT(data)
@@ -1824,6 +1823,7 @@ reference = data.table(allele = names(reference), sequence = reference, allele_c
 
 
 if (file.exists(change_file)) {
+	changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
 	# Apply changes to v_call
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
