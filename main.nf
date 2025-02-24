@@ -1828,8 +1828,8 @@ if (file.exists(change_file)) {
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
 	  new_id <- changes[change, "new_id"]
-	  data[str_detect(v_call, fixed(new_id)), v_call_changed := old_id]
-	  reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
+	  data[str_detect(v_call, fixed(new_id)), v_call_changed := str_replace(v_call, fixed(new_id), old_id)]
+	  reference[str_detect(allele, fixed(new_id)), allele_changed := str_replace(v_call, fixed(new_id), old_id)]
 	}
 	data[["v_call"]] <- data[["v_call_changed"]]
 } else {
@@ -1848,8 +1848,8 @@ if (file.exists("changes.csv")) {
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
 	  new_id <- changes[change, "new_id"]
-	  data[str_detect(v_call, fixed(new_id)), v_call_changed := old_id]
-	  reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
+	  data[str_detect(v_call, fixed(new_id)), v_call_changed := str_replace(v_call, fixed(new_id), old_id)]
+	  reference[str_detect(allele, fixed(new_id)), allele_changed := str_replace(v_call, fixed(new_id), old_id)]
 	}
 	data[["v_call"]] <- data[["v_call_changed"]]
 } else {
