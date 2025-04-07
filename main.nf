@@ -29,8 +29,8 @@ params.First_Alignment_Collapse_AIRRseq.ncores = 20
 // Process Parameters for Undocumented_Alleles:
 params.Undocumented_Alleles.chain = params.chain
 params.Undocumented_Alleles.num_threads = params.nproc
-params.Undocumented_Alleles.germline_min = 200
-params.Undocumented_Alleles.min_seqs = 50
+params.Undocumented_Alleles.germline_min = 20
+params.Undocumented_Alleles.min_seqs = 7
 params.Undocumented_Alleles.auto_mutrange = "true"
 params.Undocumented_Alleles.mut_range = "1:10"
 params.Undocumented_Alleles.pos_range = "1:318"
