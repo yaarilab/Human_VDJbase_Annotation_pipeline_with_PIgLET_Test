@@ -1823,7 +1823,8 @@ reference <- data.table(
 )
 
 replace_exact <- function(dt, col, id_from, id_to) {
-  pattern <- sprintf("(?<=^|,)(%s)(?=,|\$)", str_replace_all(id_from, "([*+?.^\$(){}|\\[\\]\\\\])", "\\\\\\1"))
+  escaped_id <- str_replace_all(id_from, "([][()*+?.^\$|{}\\\\])", "\\\\\\1")
+  pattern <- sprintf("(?<=^|,)(%s)(?=,|\$)", escaped_id)
   dt[grepl(pattern, get(col)), (col) := str_replace_all(get(col), pattern, id_to)]
 }
 
