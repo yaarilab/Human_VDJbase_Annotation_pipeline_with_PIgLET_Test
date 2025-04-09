@@ -29,8 +29,8 @@ params.First_Alignment_Collapse_AIRRseq.ncores = 20
 // Process Parameters for Undocumented_Alleles:
 params.Undocumented_Alleles.chain = params.chain
 params.Undocumented_Alleles.num_threads = params.nproc
-params.Undocumented_Alleles.germline_min = 20
-params.Undocumented_Alleles.min_seqs = 7
+params.Undocumented_Alleles.germline_min = 200
+params.Undocumented_Alleles.min_seqs = 50
 params.Undocumented_Alleles.auto_mutrange = "true"
 params.Undocumented_Alleles.mut_range = "1:10"
 params.Undocumented_Alleles.pos_range = "1:318"
@@ -1793,112 +1793,85 @@ outname_selected = airrFile.toString() - '.tsv' +"_to_piglet"
 #!/usr/bin/env Rscript
 
 library(data.table)
-library(alakazam)
-library(ggplot2)
-library(dplyr)
-library(parallel)
-library(pbapply)
 library(stringr)
+library(tigger)
 
-sample <- strsplit(basename("${airrFile}"), "[.]")[[1]][1]
+# Read inputs
+airr_file <- "${airrFile}"
+chain <- "${chain}"
+outname <- "${outname}"
+outname_selected <- "${outname_selected}"
+sample <- strsplit(basename(airr_file), "[.]")[[1]][1]
 
-select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", "j_call") else c("sequence_id", "v_call", "j_call")
-data <- data.table::fread("${airrFile}", data.table = F)
-
-# Load V change file
-change_file <- "v_changes.csv"
-
-# Convert to data.table
+# Read AIRR data and convert to data.table
+data <- fread(airr_file)
 setDT(data)
 
-# Add new columns to data
+# Create mutable fields
 data[, `:=`(
   v_call_changed = v_call,
-  d_call_changed = d_call,
+  d_call_changed = if ("d_call" %in% names(data)) d_call else NA,
   j_call_changed = j_call
 )]
 
-reference = tigger::readIgFasta("${reference}")
-reference = data.table(allele = names(reference), sequence = reference, allele_changed = names(reference))
+# Load reference
+reference <- readIgFasta("${reference}")
+reference <- data.table(
+  allele = names(reference),
+  sequence = reference,
+  allele_changed = names(reference)
+)
 
-
-if (file.exists(change_file)) {
-	changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-	# Apply changes to v_call
-	for (change in 1:nrow(changes)) {
-	  old_id <- changes[change, "old_id"]
-	  new_id <- changes[change, "new_id"]
-	  data[str_detect(v_call, fixed(new_id)), v_call_changed := str_replace(v_call, fixed(new_id), old_id)]
-	  reference[str_detect(allele, fixed(new_id)), allele_changed := str_replace(allele, fixed(new_id), old_id)]
-	}
-	data[["v_call"]] <- data[["v_call_changed"]]
-} else {
-  message("Change file does not exist. No changes applied to v_call.")
+replace_exact <- function(dt, col, id_from, id_to) {
+  pattern <- sprintf("(?<=^|,)(%s)(?=,|$)", str_replace_all(id_from, "([*+?.^$(){}|\\[\\]\\\\])", "\\\\\\1"))
+  dt[grepl(pattern, get(col)), (col) := str_replace_all(get(col), pattern, id_to)]
 }
 
-if (file.exists("changes.csv")) {
-	data[, `:=`(
-	  v_call_changed = v_call,
-	  d_call_changed = d_call,
-	  j_call_changed = j_call
-	)]
-	# Apply changes to v_call
-	change_file <- "changes.csv"
-    changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-	for (change in 1:nrow(changes)) {
-	  old_id <- changes[change, "old_id"]
-	  new_id <- changes[change, "new_id"]
-	  data[str_detect(v_call, fixed(new_id)), v_call_changed := str_replace(v_call, fixed(new_id), old_id)]
-	  reference[str_detect(allele, fixed(new_id)), allele_changed := str_replace(allele, fixed(new_id), old_id)]
-	}
-	data[["v_call"]] <- data[["v_call_changed"]]
-} else {
-  message("Change file does not exist. No changes applied to v_call.")
-}
-
-# Apply changes to d_call if chain is IGH
-if ("${chain}" == "IGH") {
-  change_file <- "d_changes.csv"
-  if (file.exists(change_file)) {
-	  changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-	  for (change in 1:nrow(changes)) {
-	    old_id <- changes[change, "old_id"]
-	    new_id <- changes[change, "new_id"]
-	    data[, d_call_changed := str_replace_all(d_call_changed, fixed(new_id), old_id)]
-	    reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
-	  }
-	  data[["d_call"]] <- data[["d_call_changed"]]
-	} else {
-	  message("Change file does not exist. No changes applied to d_call.")
-	}
-}
-
-change_file <- "j_changes.csv"
-# Apply changes to j_call
-if (file.exists(change_file)) {
-  changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-  for (change in 1:nrow(changes)) {
-    old_id <- changes[change, "old_id"]
-    new_id <- changes[change, "new_id"]
-    data[, j_call_changed := str_replace_all(j_call_changed, fixed(new_id), old_id)]
-    reference[str_detect(allele, fixed(new_id)), allele_changed := old_id]
+# Apply changes for a given file and target column
+apply_changes <- function(file, dt, col, ref_col = "allele", ref_out_col = "allele_changed", reverse = FALSE) {
+  if (!file.exists(file)) {
+    message(sprintf("File %s not found. Skipping.", file))
+    return()
   }
-  data[["j_call"]] <- data[["j_call_changed"]]
-} else {
-  message("Change file does not exist. No changes applied to j_call.")
+  changes <- fread(file, header = FALSE, col.names = c("row", "old_id", "new_id"))
+  for (i in 1:nrow(changes)) {
+    from <- if (reverse) changes[i, new_id] else changes[i, old_id]
+    to   <- if (reverse) changes[i, old_id] else changes[i, new_id]
+    replace_exact(dt, col, from, to)
+    replace_exact(reference, ref_col, from, to)
+    if (ref_out_col != ref_col) replace_exact(reference, ref_out_col, from, to)
+  }
 }
 
-# Write the full output file
-write.table(data, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FALSE)
+# V call changes
+apply_changes("v_changes.csv", data, "v_call_changed")
+data[, v_call := v_call_changed]
 
-# Write the selected columns output
-select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", "j_call") else c("sequence_id", "v_call", "j_call")
-setDT(data)
-data_selected <- data[, .SD, .SDcols = select_columns]
-write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".tsv"), row.names = FALSE)
+# Reverse V call changes
+apply_changes("changes.csv", data, "v_call_changed", reverse = TRUE)
+data[, v_call := v_call_changed]
 
-# write the reference
-write.table(reference, sep = "\t", file = paste0("${outname}_reference", ".tsv"), row.names = FALSE)
+# D call (only for IGH)
+if (chain == "IGH") {
+  apply_changes("d_changes.csv", data, "d_call_changed")
+  data[, d_call := d_call_changed]
+}
+
+# J call
+apply_changes("j_changes.csv", data, "j_call_changed")
+data[, j_call := j_call_changed]
+
+# Final outputs
+write.table(data, sep = "\t", file = paste0(outname, ".tsv"), row.names = FALSE)
+
+selected_cols <- if (chain == "IGH") {
+  c("sequence_id", "v_call", "d_call", "j_call")
+} else {
+  c("sequence_id", "v_call", "j_call")
+}
+fwrite(data[, ..selected_cols], sep = "\t", file = paste0(outname_selected, ".tsv"))
+
+fwrite(reference, sep = "\t", file = paste0(outname, "_reference.tsv"))
 """
 
 }
