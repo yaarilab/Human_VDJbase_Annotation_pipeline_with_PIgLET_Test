@@ -1795,6 +1795,7 @@ outname_selected = airrFile.toString() - '.tsv' +"_to_piglet"
 library(data.table)
 library(stringr)
 library(tigger)
+library(dplyr)
 
 # Read inputs
 airr_file <- "${airrFile}"
@@ -1822,10 +1823,16 @@ reference <- data.table(
   allele_changed = names(reference)
 )
 
+escape_regex <- function(string) {
+  string %>%
+    str_replace_all("\\\\", "\\\\\\\\") %>%                      # Escape \
+    str_replace_all("([.()\\[\\]{}+*?^\$|])", "\\\\\\1")          # Escape everything else
+}
+
 replace_exact <- function(dt, col, id_from, id_to) {
-  escaped_id <- str_replace_all(id_from, "([][()*+?.^\$|{}\\\\])", "\\\\\\1")
+  escaped_id <- escape_regex(id_from)
   pattern <- sprintf("(?<=^|,)(%s)(?=,|\$)", escaped_id)
-  dt[grepl(pattern, get(col)), (col) := str_replace_all(get(col), pattern, id_to)]
+  dt[str_detect(get(col), pattern), (col) := str_replace_all(get(col), pattern, id_to)]
 }
 
 # Apply changes for a given file and target column
