@@ -1825,8 +1825,8 @@ reference <- data.table(
 
 escape_regex <- function(string) {
   string %>%
-    str_replace_all("\\\\", "\\\\\\\\") %>%                      # Escape \
-    str_replace_all("([.()\\[\\]{}+*?^\$|])", "\\\\\\1")          # Escape everything else
+    str_replace_all("\\\\", "\\\\\\\\") %>%
+    str_replace_all("([.()\\[\\]{}+*?^\$|])", "\\\\\\1")
 }
 
 replace_exact <- function(dt, col, id_from, id_to) {
