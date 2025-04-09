@@ -1825,12 +1825,12 @@ reference <- data.table(
 
 # Replacement function without regex (safe for Nextflow)
 replace_exact <- function(dt, col, id_from, id_to) {
-  dt[, (col) := lapply(.SD[[1]], function(val) {
-    if (is.na(val)) return(NA)
+  dt[, (col) := vapply(.SD[[1]], function(val) {
+    if (is.na(val)) return(NA_character_)
     parts <- str_split(val, ",")[[1]]
     parts <- ifelse(parts == id_from, id_to, parts)
     str_c(parts, collapse = ",")
-  }), .SDcols = col]
+  }, character(1L)), .SDcols = col]
 }
 
 # Apply changes for a given file and target column
